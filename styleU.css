@@ -1,0 +1,40 @@
+body {
+  font-family:"Trebuchet MS", Helvetica, sans-serif;
+}
+header {
+  background-color: #7aff9c;
+  text-align: center;
+}
+
+header h1, img {
+  vertical-align: middle;
+  display: inline;
+}
+
+p {
+  width: 50%;
+  float:left;
+  padding-left: 10%;
+  padding-top: 5%;
+}
+
+.chapLine {
+  font-size: 20px;
+  fill: #000000;
+}
+
+.axisLabel {
+  text-anchor: middle;
+}
+#y0 .axisLabel {
+  fill: #1668ff;
+}
+#y1 .axisLabel {
+  fill: #6b00a6;
+}
+.y0Line,.y1Line {
+  fill: none;
+}
+#myRange {
+  position: absolute;
+}

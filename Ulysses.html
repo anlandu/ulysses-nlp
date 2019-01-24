@@ -1,0 +1,217 @@
+<!--Anlan Du
+CSC630 Period 3
+Dr. Zufelt
+Text Project: Ulysses Analysis
+10-2-17-->
+<!DOCTYPE=html>
+<html>
+<head>
+  <meta charset= 'utf-8'>
+  <title>Ulysses Data Analysis</title>
+  <link href="styleU.css" type="text/css" rel="stylesheet">
+</head>
+<body>
+  <header>
+    <h1>An Examination of the Episodes of Ulysses</h1>
+  </header>
+</body>
+<div id="container">
+  <!-- Slider for switching episodes -->
+  <input type="range" min="0" max="17" value="0" class="slider" id="myRange">
+</div>
+<p>
+  Welcome to my visualization of <a href="http://www.gutenberg.org/files/4300/4300-h/4300-h.htm" target="_blank">Ulysses</a>,
+  by James Joyce! Above is a chart illustrating the average sentence length and
+  number of sentences in each episode of the novel. On the right is a list of the
+  most common words in the selected episode, along with the words' frequencies.
+  Please use the slider to switch between episodes; note that the
+  visualization will update upon release of the slider.
+</p>
+<script src='https://d3js.org/d3.v4.min.js'></script>
+<script>
+const margin = {
+  top: 30,
+  bottom: 50,
+  left: 100,
+  right: 30,
+}, width = window.innerWidth-margin.left-margin.right,
+  height = 500;
+  //******* Import sentence and chapter data *******
+  // I don't use sentence data, but it's convenient to have on hand
+  d3.csv("http://localhost:8000/sentData.csv", function(error, sentData) {
+    d3.csv("http://localhost:8000/chapData.csv", function(error, chapData) {
+      //convert strings into ints
+      chapData.forEach(function(d,i){
+        d.numSent=+d.numSent;
+        d.punctuatuion=+d.punctuation;
+        d.avgSentLen=+d.avgSentLen;
+        d.avgWordLen=+d.avgWordLen;
+        d.numLetters=+d.numLetters;
+        d.numWords=+d.numWords;
+        d.punctuation=+d.punctuation;
+      })
+
+      //append SVG
+      var svg=d3.select("#container")
+        .append("svg")
+        .attr("width",width)
+        .attr("height",height)
+        .style("margin","0 auto")
+        .style("display","block")
+        .style("overflow","visible")
+
+      //append a text area in which to put common words
+      var textArea=svg.append("text")
+        .attr("transform", `translate(${width*.5+margin.left+margin.right*2}, ${margin.top})`)
+        .attr("id","wordsArea")
+
+      //modify the episode-selection slider to fit my needs
+      var slider=d3.select("#myRange")
+        .style("width",width*.5)
+        .style("left",margin.left*1.6)
+        .style("top",margin.top+height+margin.bottom)
+        //note: would have preferred "on input," (live updating) but at high
+        //speeds D3 transitions get buggy so making it "on change" (on mouse
+        //release) minimizes bugs
+        .on("change", function(d) { updateWords(d3.select(this).property("value")) })
+      updateWords(0);
+
+      //******* Updates common words, other info given an episode number *******
+      function updateWords(chapter) {
+        chapter=+chapter;
+        d3.csv(`http://localhost:8000/chaptDict${chapter}.csv`, function(error, dataset) {
+
+          //Update the displayed episode number, # of sentences, avg sentence length
+          textArea.selectAll(".chapLine")
+            .remove();
+
+          textArea.append("tspan")
+            .attr("class","chapLine")
+            .attr("x",0)
+            .attr("y",0)
+            .text(`Episode ${chapter+1}: ${chapData[chapter].numSent} sentences`);
+
+          textArea.append("tspan")
+              .attr("class", "chapLine")
+              .attr("x",0)
+              .attr("y", 30)
+              .text(`Average ${chapData[chapter].avgSentLen.toFixed(2)} words per sentence`);
+
+          textArea.append("tspan")
+              .attr("class", "chapLine")
+              .attr("x",0)
+              .attr("y", 80)
+              .style("font-size", "40px")
+              .text('Common Words:');
+
+          //Updates the common words using the word as a key function
+          var words=textArea.selectAll(".word")
+            .data(dataset, function(d) { return d.word; })
+
+          //Remove exited words, turning them red and sending them to right
+          words.exit()
+            .style("fill-opacity",1.0)
+            .attr("fill","#FF0000")
+            .transition()
+            .duration(450)
+            .attr("x",1000)
+            .style("fill-opacity",0)
+            .remove();
+
+          //Updates position and displayed number for remaining words
+          words.transition()
+            .duration(450)
+            .attr("x", function(d,i) {return 150*Math.floor(i/25) })
+            .attr("y", function(d,i) { console.log(i);return 115+(i%25)*20})
+            .text(function(d) {return `${d.word} (${d.freq})`})
+            .attr("fill","#000000")
+
+          //Adds new words, summoning from left and displaying as green
+          words.enter()
+            .append("tspan")
+            .attr("class","word")
+            .style("fill-opacity",0.0)
+            .attr("y", function(d,i) { return 115+(i%25)*20 })
+            .attr("fill","#007e00")
+            .attr("x",-400)
+            .transition()
+            .duration(450)
+            .style("fill-opacity",1.0)
+            .attr("x", function(d,i) {return 150*Math.floor(i/25) })
+            .text(function(d) {return `${d.word} (${d.freq})`})
+
+        })
+      }
+      //******* Add Scales for x and y axes, and line generators *******
+      var x=d3.scaleLinear()
+        .domain([1,18])
+        .range([margin.left, margin.left+width*.5]);
+      var y0=d3.scaleLinear()
+        .domain(d3.extent(chapData, function(d) { return d.numSent }))
+        .range([height-margin.bottom+margin.top,margin.top])
+      var y1=d3.scalePow()
+        .exponent(-.4)
+        .domain([1,d3.max(chapData, function(d) {return d.avgSentLen})])
+        .range([height-margin.bottom+margin.top,margin.top])
+      var	y0Line = d3.line()
+        .x(function(d,i) { return x(i+1); })
+        .y(function(d) { return y0(d.numSent); });
+      var	y1Line = d3.line()
+        .x(function(d,i) { return x(i+1); })
+        .y(function(d) { return y1(d.avgSentLen); });
+
+      //******* Append Axes *******
+      var xAxis=svg.append("g")
+        .attr("transform",`translate(${0}, ${height+margin.top-margin.bottom})`)
+        .attr("class","xAxis")
+        .call(d3.axisBottom(x).ticks(18));
+      var y0Axis=svg.append("g")
+        .attr("transform",`translate(${margin.left}, ${0})`)
+        .attr("class","yAxis")
+        .attr("id","y0")
+        .call(d3.axisLeft(y0));
+      var y1Axis=svg.append("g")
+        .attr("transform",`translate(${margin.left+width*.5}, ${0})`)
+        .attr("class","yAxis")
+        .attr("id","y1")
+        .call(d3.axisRight(y1)
+          .tickValues([2,4,8,16,32,64,128,1024,8192])
+          .tickFormat(function(d) {return d}));
+
+      //******* Append axis labels *******
+      d3.select(".xAxis")
+        .append("text")
+        .attr("class","axisLabel")
+        .attr("transform", `translate(${width*.25+margin.left}, ${margin.bottom})`)
+        .style("fill", "#000000")
+        .text("Episode Number");
+      d3.select("#y0")
+        .append("text")
+        .attr("class","axisLabel")
+        .attr("transform", `translate(${-margin.left/2},
+          ${height/2}) rotate(-90)`)
+        .text("Number of Sentences");
+      d3.select("#y1")
+        .append("text")
+        .attr("class","axisLabel")
+        .attr("transform", `translate(${margin.right},
+          ${height/2}) rotate(90)`)
+        .text("Average Sentence Length");
+
+      //******* Append chart lines for avg sentence length and num sentences *******
+      svg.append("path")
+        .data(chapData)
+        .attr("class","y0Line")
+        .style("stroke","#1668ff")
+    		.attr("d", y0Line(chapData));
+      svg.append("path")
+        .data(chapData)
+        .attr("class","y1Line")
+        .style("stroke","#6b00a6")
+    		.attr("d", y1Line(chapData));
+    })
+  })
+
+</script>
+
+</html>
